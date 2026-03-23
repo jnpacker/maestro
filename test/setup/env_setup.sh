@@ -68,8 +68,8 @@ else
     exit 1
 fi
 
-# Build images with current code
-make image e2e-image
+# Build the main image (e2e image is built separately, only needed for make e2e-test/istio)
+make image
 
 # Create a KinD cluster
 if [ ! -f "$KUBECONFIG" ]; then
@@ -83,8 +83,8 @@ nodes:
     hostPort: 30080
   - containerPort: 30090
     hostPort: 30090
-  - containerPort: 30100
-    hostPort: 30100
+  - containerPort: 30091
+    hostPort: 30091
   kubeadmConfigPatches:
   - |
     kind: KubeletConfiguration
@@ -94,18 +94,14 @@ nodes:
 EOF
 fi
 
-# Load the images based on container tool
+# Load the maestro image into the KinD cluster
 if [ "$container_tool" = "docker" ]; then
     kind load docker-image ${external_image_registry}/maestro/maestro:$image_tag --name maestro
-    kind load docker-image ${external_image_registry}/maestro/maestro-e2e:$image_tag --name maestro
 else
     # related issue: https://github.com/kubernetes-sigs/kind/issues/2038
     podman save ${external_image_registry}/maestro/maestro:$image_tag -o /tmp/maestro.tar
     kind load image-archive /tmp/maestro.tar --name maestro
     rm /tmp/maestro.tar
-    podman save ${external_image_registry}/maestro/maestro-e2e:$image_tag -o /tmp/maestro-e2e.tar
-    kind load image-archive /tmp/maestro-e2e.tar --name maestro
-    rm /tmp/maestro-e2e.tar
 fi
 
 # Prepare a in-cluster kubeconfig

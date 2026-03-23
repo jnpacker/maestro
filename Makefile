@@ -71,8 +71,9 @@ pubsub_image ?= gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
 # Log verbosity level
 klog_v:=2
 
-# message driver type, mqtt, grpc or pubsub, default is mqtt.
-MESSAGE_DRIVER_TYPE ?= mqtt
+# message driver type, mqtt, grpc or pubsub, default is grpc.
+MESSAGE_DRIVER_TYPE ?= grpc
+export MESSAGE_DRIVER_TYPE
 
 # Test output files
 unit_test_json_output ?= ${PWD}/unit-test-results.json
@@ -109,6 +110,11 @@ help:
 	@echo "make undeploy-agent       undeploy maestro agent"
 	@echo "make lint-charts          lint Helm charts"
 	@echo "make clean                delete temporary generated files"
+	@echo "make test-env/add-clients         add N client kind clusters (N_CLIENTS=3)"
+	@echo "make test-env/cleanup-clients     clean up all client kind clusters"
+	@echo "make test-env/push-server-image   build and load server image into test-env KinD cluster"
+	@echo "make test-env/deploy-soloist      deploy managedcluster-soloist-controller into test-env"
+	@echo "make rollout/restart              restart the maestro deployment and wait for rollout"
 	@echo "$(fake)"
 .PHONY: help
 
@@ -405,9 +411,63 @@ test-env/cleanup:
 	./test/setup/env_cleanup.sh
 .PHONY: test-env/cleanup
 
+# Deploy the managedcluster-soloist-controller (server mode) into the test environment
+# Requires Maestro to be deployed first (test-env/deploy-server).
+# Override SOLOIST_DIR to point at a non-default checkout location.
+test-env/deploy-soloist:
+	./test/setup/deploy_soloist.sh
+.PHONY: test-env/deploy-soloist
+
 # Prepare the test environment using Helm charts
-test-env: test-env/cleanup test-env/setup test-env/deploy-server test-env/deploy-agent
+test-env: test-env/cleanup test-env/setup test-env/deploy-server test-env/deploy-agent test-env/deploy-soloist
 .PHONY: test-env
+
+# Create N additional kind clusters and register each as a Maestro consumer with a deployed agent
+# Uses gRPC message broker. Requires an existing server: run 'make test-env/deploy-server' first.
+# Usage: N_CLIENTS=3 make test-env/add-clients
+test-env/add-clients:
+	N_CLIENTS=$(N_CLIENTS) ./test/setup/add_clients.sh
+.PHONY: test-env/add-clients
+
+# Clean up all client kind clusters created by test-env/add-clients
+test-env/cleanup-clients:
+	./test/setup/cleanup_clients.sh
+.PHONY: test-env/cleanup-clients
+
+# Build and load the Maestro server image into the test-env KinD cluster
+# Rebuilds the binary and container image with test-env registry/tag, loads it into KinD, and restarts the server deployment
+test-env/push-server-image:
+	external_image_registry=image-registry.testing image_tag=latest $(MAKE) image
+	@if [ "$(container_tool)" = "docker" ]; then \
+		kind load docker-image image-registry.testing/maestro/maestro:latest --name maestro; \
+	else \
+		$(container_tool) save image-registry.testing/maestro/maestro:latest -o /tmp/maestro.tar; \
+		kind load image-archive /tmp/maestro.tar --name maestro; \
+		rm /tmp/maestro.tar; \
+	fi
+	KUBECONFIG=${PWD}/test/_output/.kubeconfig kubectl rollout restart deploy/maestro -n maestro
+	KUBECONFIG=${PWD}/test/_output/.kubeconfig kubectl rollout status deploy/maestro -n maestro --timeout=300s
+.PHONY: test-env/push-server-image
+
+# Build and load the Maestro e2e image into the test-env KinD cluster
+# Only needed for in-cluster e2e test runs (e.g. make e2e-test/istio)
+test-env/load-e2e-image:
+	external_image_registry=image-registry.testing image_tag=latest $(MAKE) e2e-image
+	@if [ "$(container_tool)" = "docker" ]; then \
+		kind load docker-image image-registry.testing/maestro/maestro-e2e:latest --name maestro; \
+	else \
+		$(container_tool) save image-registry.testing/maestro/maestro-e2e:latest -o /tmp/maestro-e2e.tar; \
+		kind load image-archive /tmp/maestro-e2e.tar --name maestro; \
+		rm /tmp/maestro-e2e.tar; \
+	fi
+.PHONY: test-env/load-e2e-image
+
+# Restart the Maestro server deployment and wait for it to be ready
+# Useful after loading a new image into the test-env KinD cluster
+rollout/restart:
+	KUBECONFIG=${PWD}/test/_output/.kubeconfig kubectl rollout restart deployment/maestro -n $(namespace)
+	KUBECONFIG=${PWD}/test/_output/.kubeconfig kubectl rollout status deployment/maestro -n $(namespace) --timeout=300s
+.PHONY: rollout/restart
 
 # Runs the e2e tests.
 #
@@ -440,7 +500,7 @@ e2e-test/run:
 e2e-test: test-env e2e-test/run
 .PHONY: e2e-test
 
-e2e-test/istio: test-env
+e2e-test/istio: test-env test-env/load-e2e-image
 	./test/e2e/istio/test.sh
 .PHONY: e2e-test/istio
 

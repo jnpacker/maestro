@@ -16,9 +16,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"k8s.io/klog/v2"
 	workpayload "open-cluster-management.io/sdk-go/pkg/cloudevents/clients/work/payload"
+	"open-cluster-management.io/sdk-go/pkg/cloudevents/constants"
 	pbv1 "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protobuf/v1"
 	grpcprotocol "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options/grpc/protocol"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
@@ -269,6 +271,15 @@ func (svr *GRPCServer) Subscribe(subReq *pbv1.SubscriptionRequest, subServer pbv
 		}
 	}
 
+	// Send the subscription-id header immediately — before any goroutines or channels
+	// are started — so that it is guaranteed to arrive before any streamed messages.
+	// If Send() is called before SendHeader(), gRPC implicitly flushes empty headers
+	// (only content-type), which means the client never sees the subscription-id.
+	subID := uuid.New().String()
+	if err := subServer.SendHeader(metadata.Pairs(constants.GRPCSubscriptionIDKey, subID)); err != nil {
+		return fmt.Errorf("failed to send subscription-id header: %v", err)
+	}
+
 	ctx, cancel := context.WithCancel(subServer.Context())
 	defer cancel()
 
@@ -491,8 +502,20 @@ func (svr *GRPCServer) respondResyncStatusRequest(ctx context.Context, evt *ce.E
 	for _, obj := range objs {
 		lastHash, ok := findStatusHash(string(obj.GetUID()), statusHashes.Hashes)
 		if !ok {
-			// ignore the resource that is not on the source, but exists on the maestro, wait for the source deleting it
-			logger.Info("The resource is not found from the maestro, ignore", "resourceID", obj.GetUID())
+			// The agent has no record of this resource. If it is already marked as deleting,
+			// hard-delete it now: the agent has either already cleaned it up (status was reported
+			// but confirmation was lost) or it was never applied. Either way the agent-side state
+			// is gone and keeping the record blocks consumer deletion and new creates.
+			if !obj.GetDeletionTimestamp().IsZero() {
+				logger.Info("Hard-deleting resource in deleting state not found on agent",
+					"resourceID", obj.GetUID())
+				if delErr := svr.resourceService.Delete(ctx, string(obj.GetUID())); delErr != nil {
+					logger.Error(delErr, "Failed to hard-delete stuck resource", "resourceID", obj.GetUID())
+				}
+			} else {
+				// ignore the resource that is not on the source, but exists on the maestro, wait for the source deleting it
+				logger.Info("The resource is not found from the maestro, ignore", "resourceID", obj.GetUID())
+			}
 			continue
 		}
 

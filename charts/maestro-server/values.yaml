@@ -146,6 +146,11 @@ service:
     type: ClusterIP
     port: 8090
     nodePort: 0
+  # gRPC broker service (agent-facing, only used when messageBroker.type=grpc)
+  grpcBroker:
+    type: ClusterIP
+    port: 8091
+    nodePort: 0
   # Metrics service
   metrics:
     port: 8080

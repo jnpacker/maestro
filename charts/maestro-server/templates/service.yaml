@@ -86,10 +86,13 @@ metadata:
 spec:
   selector:
     {{- include "maestro-server.selectorLabels" . | nindent 4 }}
-  type: ClusterIP
+  type: {{ .Values.service.grpcBroker.type }}
   ports:
     - name: grpc-broker
-      port: 8091
-      targetPort: 8091
+      {{- if ne (int .Values.service.grpcBroker.nodePort) 0 }}
+      nodePort: {{ .Values.service.grpcBroker.nodePort }}
+      {{- end }}
+      port: {{ .Values.service.grpcBroker.port }}
+      targetPort: {{ .Values.service.grpcBroker.port }}
       protocol: TCP
 {{- end }}

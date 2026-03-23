@@ -54,6 +54,8 @@ clientCertRefreshDuration: 5s
 
 consumerName: ${consumer_name}
 
+cloudeventsClientId: ${consumer_name:0:52}-work-agent
+
 serviceAccount:
   name: maestro-agent-sa
 

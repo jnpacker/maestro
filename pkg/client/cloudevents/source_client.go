@@ -134,6 +134,15 @@ func (s *SourceClientImpl) OnDelete(ctx context.Context, id string) error {
 	if resource.Meta.DeletedAt.Time.IsZero() {
 		return fmt.Errorf("resource %s has not been marked as deleting", resource.ID)
 	}
+
+	// If the resource was never applied to the agent (empty status), there is nothing
+	// to clean up on the agent side. Hard-delete it immediately rather than publishing
+	// a delete CloudEvent that the agent may never acknowledge.
+	if len(resource.Status) == 0 {
+		logger.Info("Hard-deleting resource that was never applied to the agent")
+		return s.ResourceService.Delete(ctx, id)
+	}
+
 	logger.Info("Publishing resource for db row delete")
 	eventType := cetypes.CloudEventsType{
 		CloudEventsDataType: s.Codec.EventDataType(),

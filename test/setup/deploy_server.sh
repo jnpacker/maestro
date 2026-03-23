@@ -161,6 +161,10 @@ service:
     type: NodePort
     port: 8090
     nodePort: 30090
+  grpcBroker:
+    type: $( [ "$msg_broker" = "grpc" ] && echo "NodePort" || echo "ClusterIP" )
+    port: 8091
+    nodePort: $( [ "$msg_broker" = "grpc" ] && echo "30091" || echo "0" )
   metrics:
     port: 8080
   healthcheck:
