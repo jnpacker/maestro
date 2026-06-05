@@ -76,6 +76,9 @@ func (s *sqlResourceService) Create(ctx context.Context, resource *api.Resource)
 	if err := ValidateManifestBundle(resource.Payload); err != nil {
 		return nil, errors.Validation("the manifest bundle in the resource is invalid, %v", err)
 	}
+	if err := ValidateAttestationMode(resource.AttestationMode); err != nil {
+		return nil, errors.Validation("the attestation mode in the resource is invalid, %v", err)
+	}
 
 	resource, err := s.resourceDao.Create(ctx, resource)
 	if err != nil {
@@ -128,11 +131,17 @@ func (s *sqlResourceService) Update(ctx context.Context, resource *api.Resource)
 		return nil, errors.Validation("the new manifest bundle in the resource is invalid, %v", err)
 	}
 
+	if err := ValidateAttestationMode(resource.AttestationMode); err != nil {
+		return nil, errors.Validation("the attestation mode in the resource is invalid, %v", err)
+	}
+
 	// Increase the current resource version and update its manifest.
 	// Note: Maestro agent sets work metadata generation from the current resource version,
 	// ignoring the `generation` and `resourceVersion` from the CloudEvents metadata extension.
 	found.Version = found.Version + 1
 	found.Payload = resource.Payload
+	found.Attestation = resource.Attestation
+	found.AttestationMode = resource.AttestationMode
 
 	updated, err := s.resourceDao.Update(ctx, found)
 	if err != nil {

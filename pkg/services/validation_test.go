@@ -49,6 +49,30 @@ func TestValidateConsumer(t *testing.T) {
 	}
 }
 
+func TestValidateAttestationMode(t *testing.T) {
+	cases := []struct {
+		mode    string
+		wantErr bool
+	}{
+		{"", false},
+		{"none", false},
+		{"intent", false},
+		{"output", false},
+		{"invalid", true},
+		{"INTENT", true},
+		{"Intent", true},
+		{"tampered", true},
+	}
+	for _, c := range cases {
+		t.Run("mode="+c.mode, func(t *testing.T) {
+			err := ValidateAttestationMode(c.mode)
+			if (err != nil) != c.wantErr {
+				t.Errorf("ValidateAttestationMode(%q) error = %v, wantErr %v", c.mode, err, c.wantErr)
+			}
+		})
+	}
+}
+
 func TestValidateResourceName(t *testing.T) {
 	cases := []struct {
 		name             string

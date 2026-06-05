@@ -24,6 +24,12 @@ type Resource struct {
 	// When creating a resource, if its name is not specified, the resource id will be used as its name.
 	// Cannot be updated.
 	Name string
+	// Attestation holds the self-contained VerificationBundle for FleetShift attested delivery.
+	// Null for legacy resources (AttestationMode == "none").
+	Attestation datatypes.JSONMap
+	// AttestationMode controls whether agents verify the attestation chain before applying.
+	// Valid values: "none" (default, legacy path), "intent", "output".
+	AttestationMode string
 }
 
 type ResourceList []*Resource

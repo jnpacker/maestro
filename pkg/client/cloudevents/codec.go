@@ -31,6 +31,10 @@ func (codec *Codec) EventDataType() cetypes.CloudEventsDataType {
 }
 
 func (codec *Codec) Encode(source string, eventType cetypes.CloudEventsType, res *api.Resource) (*cloudevents.Event, error) {
+	if isAttestedMode(res.AttestationMode) {
+		return encodeAttested(source, eventType, res)
+	}
+
 	// use resource id as the resource payload metadata name to ensure the payload metadata name is
 	// unique on the agent side
 	if err := resetPayloadMetadataNameWithResID(res); err != nil {

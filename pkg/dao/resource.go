@@ -54,10 +54,12 @@ func (d *sqlResourceDao) Update(ctx context.Context, resource *api.Resource) (*a
 	g2 := (*d.sessionFactory).New(ctx)
 	if err := g2.Unscoped().Omit(clause.Associations).
 		Where("id = ?", resource.ID).
-		Select("version", "payload").
+		Select("version", "payload", "attestation", "attestation_mode").
 		Updates(api.Resource{
-			Version: resource.Version,
-			Payload: resource.Payload,
+			Version:         resource.Version,
+			Payload:         resource.Payload,
+			Attestation:     resource.Attestation,
+			AttestationMode: resource.AttestationMode,
 		}).Error; err != nil {
 		db.MarkForRollback(ctx, err)
 		return nil, err

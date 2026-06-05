@@ -51,6 +51,42 @@ paths:
         name: X-Operation-ID
         schema:
           type: string
+    post:
+      summary: Create a new resource bundle
+      security:
+        - Bearer: []
+      requestBody:
+        description: Resource bundle data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceBundle'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceBundle'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Auth token is invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected error occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/maestro/v1/resource-bundles/{id}:
     get:
       summary: Get a resource bundle by id
@@ -432,6 +468,16 @@ components:
               type: object
           status:
             type: object
+          attestation:
+            type: object
+            description: Self-contained VerificationBundle for FleetShift attested delivery. Null for legacy resources.
+          attestation_mode:
+            type: string
+            description: Controls whether agents verify the attestation chain before applying. Valid values are "none" (default), "intent", and "output".
+            enum:
+              - none
+              - intent
+              - output
     ResourceBundleList:
       allOf:
       - $ref: '#/components/schemas/List'

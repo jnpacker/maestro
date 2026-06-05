@@ -41,6 +41,17 @@ func ValidateConsumer(consumer *api.Consumer) error {
 	return fmt.Errorf("%s", errs.ToAggregate().Error())
 }
 
+// ValidateAttestationMode rejects values outside the known set.
+// An empty string is accepted and treated as "none" (legacy path).
+func ValidateAttestationMode(mode string) error {
+	switch mode {
+	case "", "none", "intent", "output":
+		return nil
+	default:
+		return fmt.Errorf("unsupported attestation mode %q: must be one of none, intent, output", mode)
+	}
+}
+
 func ValidateManifestBundle(manifestBundle datatypes.JSONMap) error {
 	manifestBundleWrapper, err := api.DecodeManifestBundle(manifestBundle)
 	if err != nil {

@@ -34,6 +34,8 @@ type ResourceBundle struct {
 	DeleteOption    map[string]interface{}   `json:"delete_option,omitempty"`
 	ManifestConfigs []map[string]interface{} `json:"manifest_configs,omitempty"`
 	Status          map[string]interface{}   `json:"status,omitempty"`
+	Attestation     map[string]interface{}   `json:"attestation,omitempty"`
+	AttestationMode *string                  `json:"attestation_mode,omitempty"`
 }
 
 // NewResourceBundle instantiates a new ResourceBundle object
@@ -501,6 +503,68 @@ func (o *ResourceBundle) SetStatus(v map[string]interface{}) {
 	o.Status = v
 }
 
+// GetAttestation returns the Attestation field value if set, zero value otherwise.
+func (o *ResourceBundle) GetAttestation() map[string]interface{} {
+	if o == nil || IsNil(o.Attestation) {
+		var ret map[string]interface{}
+		return ret
+	}
+	return o.Attestation
+}
+
+// GetAttestationOk returns a tuple with the Attestation field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ResourceBundle) GetAttestationOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Attestation) {
+		return map[string]interface{}{}, false
+	}
+	return o.Attestation, true
+}
+
+// HasAttestation returns a boolean if a field has been set.
+func (o *ResourceBundle) HasAttestation() bool {
+	if o != nil && !IsNil(o.Attestation) {
+		return true
+	}
+	return false
+}
+
+// SetAttestation gets a reference to the given map[string]interface{} and assigns it to the Attestation field.
+func (o *ResourceBundle) SetAttestation(v map[string]interface{}) {
+	o.Attestation = v
+}
+
+// GetAttestationMode returns the AttestationMode field value if set, zero value otherwise.
+func (o *ResourceBundle) GetAttestationMode() string {
+	if o == nil || IsNil(o.AttestationMode) {
+		var ret string
+		return ret
+	}
+	return *o.AttestationMode
+}
+
+// GetAttestationModeOk returns a tuple with the AttestationMode field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ResourceBundle) GetAttestationModeOk() (*string, bool) {
+	if o == nil || IsNil(o.AttestationMode) {
+		return nil, false
+	}
+	return o.AttestationMode, true
+}
+
+// HasAttestationMode returns a boolean if a field has been set.
+func (o *ResourceBundle) HasAttestationMode() bool {
+	if o != nil && !IsNil(o.AttestationMode) {
+		return true
+	}
+	return false
+}
+
+// SetAttestationMode gets a reference to the given string and assigns it to the AttestationMode field.
+func (o *ResourceBundle) SetAttestationMode(v string) {
+	o.AttestationMode = &v
+}
+
 func (o ResourceBundle) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -552,6 +616,12 @@ func (o ResourceBundle) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Status) {
 		toSerialize["status"] = o.Status
+	}
+	if !IsNil(o.Attestation) {
+		toSerialize["attestation"] = o.Attestation
+	}
+	if !IsNil(o.AttestationMode) {
+		toSerialize["attestation_mode"] = o.AttestationMode
 	}
 	return toSerialize, nil
 }

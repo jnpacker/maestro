@@ -57,6 +57,7 @@ func (s *apiServer) routes(ctx context.Context) *mux.Router {
 	// /api/maestro/v1/resource-bundles
 	apiV1ResourceBundleRouter := apiV1Router.PathPrefix("/resource-bundles").Subrouter()
 	apiV1ResourceBundleRouter.HandleFunc("", resourceBundleHandler.List).Methods(http.MethodGet)
+	apiV1ResourceBundleRouter.HandleFunc("", resourceBundleHandler.Create).Methods(http.MethodPost)
 	apiV1ResourceBundleRouter.HandleFunc("/{id}", resourceBundleHandler.Get).Methods(http.MethodGet)
 	apiV1ResourceBundleRouter.HandleFunc("/{id}", resourceBundleHandler.Delete).Methods(http.MethodDelete)
 

@@ -35,6 +35,7 @@ var MigrationList = []*gormigrate.Migration{
 	addEventInstances(),
 	addLastHeartBeatAndReadyColumnInServerInstancesTable(),
 	alterEventInstances(),
+	addAttestationColumnsToResources(),
 }
 
 // CleanUpDirtyData clean up the dirty data before migrating the tables.

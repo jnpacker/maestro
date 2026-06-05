@@ -27,8 +27,33 @@ func NewResourceBundleHandler(resource services.ResourceService, generic service
 }
 
 func (h resourceBundleHandler) Create(w http.ResponseWriter, r *http.Request) {
-	// not implemented
-	http.Error(w, "Not Implemented Yet", http.StatusNotImplemented)
+	var rb openapi.ResourceBundle
+	cfg := &handlerConfig{
+		&rb,
+		[]validate{
+			validateEmpty(&rb, "Id", "id"),
+			validateNotEmpty(&rb, "ConsumerName", "consumer_name"),
+			validateNotEmpty(&rb, "Manifests", "manifests"),
+		},
+		func() (interface{}, *errors.ServiceError) {
+			ctx := r.Context()
+			resource, err := presenters.ConvertResourceBundle(rb)
+			if err != nil {
+				return nil, errors.Validation("invalid resource bundle: %s", err)
+			}
+			created, svcErr := h.resource.Create(ctx, resource)
+			if svcErr != nil {
+				return nil, svcErr
+			}
+			presented, err := presenters.PresentResourceBundle(created)
+			if err != nil {
+				return nil, errors.GeneralError("failed to present resource bundle: %s", err)
+			}
+			return presented, nil
+		},
+		handleError,
+	}
+	handle(w, r, cfg, http.StatusCreated)
 }
 
 func (h resourceBundleHandler) Patch(w http.ResponseWriter, r *http.Request) {
