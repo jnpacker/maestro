@@ -114,7 +114,7 @@ var _ = Describe("Attestation", Ordered, Label("e2e-tests-attestation"), func() 
 		AfterAll(func() {
 			subCancel()
 
-			opIDCtx, opID := newOpIDContext(ctx)
+			_, opID := newOpIDContext(ctx)
 			By(fmt.Sprintf("delete the direct-gRPC resource (op-id: %s)", opID))
 			evt, err := helper.NewEvent(sourceID, "delete_request", agentTestOpts.consumerName, resourceID, deployName, 2, 0)
 			Expect(err).ShouldNot(HaveOccurred())
