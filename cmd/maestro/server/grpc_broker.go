@@ -215,17 +215,43 @@ func (bkr *GRPCBroker) Start(ctx context.Context) {
 
 // OnCreate is called by the controller when a resource is created on the maestro server.
 func (s *GRPCBroker) OnCreate(ctx context.Context, resourceID string) error {
-	evt, err := s.Get(ctx, resourceID, types.CreateRequestAction)
+	logger := klog.FromContext(ctx).WithValues("resourceID", resourceID)
+
+	resource, svcErr := s.resourceService.Get(ctx, resourceID)
+	if svcErr != nil {
+		if svcErr.Is404() {
+			logger.Info("skipping to publish create request for resource as it is not found")
+			return nil
+		}
+		return kubeerrors.NewInternalError(svcErr)
+	}
+
+	if !resource.Meta.DeletedAt.Time.IsZero() {
+		// The resource is already marked as deleting. Do NOT assume it was never sent to the
+		// agent: this Create event may be a stale/retried event for a resource that was already
+		// successfully delivered to (and applied by) the agent through another path. Skip this
+		// create; the corresponding delete event will propagate the delete_request.
+		logger.Info("skipping create for resource that is marked as deleting; the delete event will propagate the delete")
+		return nil
+	}
+
+	evt, err := EncodeResourceSpec(resource, types.CreateRequestAction)
 	if err != nil {
-		return err
+		return kubeerrors.NewInternalError(err)
 	}
 	return s.eventServer.HandleEvent(ctx, evt)
 }
 
 // OnUpdate is called by the controller when a resource is updated on the maestro server.
 func (s *GRPCBroker) OnUpdate(ctx context.Context, resourceID string) error {
+	logger := klog.FromContext(ctx).WithValues("resourceID", resourceID)
+
 	evt, err := s.Get(ctx, resourceID, types.UpdateRequestAction)
 	if err != nil {
+		if kubeerrors.IsNotFound(err) {
+			logger.Info("skipping to publish update request for resource as it is not found")
+			return nil
+		}
 		return err
 	}
 	return s.eventServer.HandleEvent(ctx, evt)
@@ -233,8 +259,14 @@ func (s *GRPCBroker) OnUpdate(ctx context.Context, resourceID string) error {
 
 // OnDelete is called by the controller when a resource is deleted from the maestro server.
 func (s *GRPCBroker) OnDelete(ctx context.Context, resourceID string) error {
+	logger := klog.FromContext(ctx).WithValues("resourceID", resourceID)
+
 	evt, err := s.Get(ctx, resourceID, types.DeleteRequestAction)
 	if err != nil {
+		if kubeerrors.IsNotFound(err) {
+			logger.Info("skipping to publish delete request for resource as it is not found")
+			return nil
+		}
 		return err
 	}
 

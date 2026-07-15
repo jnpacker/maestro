@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
+
 	. "github.com/onsi/gomega"
 	ceoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	cepayload "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
@@ -91,6 +94,72 @@ func newTestSourceClient(transport *mockTransport, resources []*api.Resource) *S
 		sourceID:        "test-source",
 		transport:       transport,
 	}
+}
+
+// getDeleteMockResourceService is a mock used to test OnCreate/OnDelete behavior. It allows
+// configuring the resource returned by Get and tracks whether Delete was called.
+type getDeleteMockResourceService struct {
+	services.ResourceService
+	resource     *api.Resource
+	getErr       *errors.ServiceError
+	deleteCalled bool
+}
+
+func (m *getDeleteMockResourceService) Get(_ context.Context, _ string) (*api.Resource, *errors.ServiceError) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	return m.resource, nil
+}
+
+func (m *getDeleteMockResourceService) Delete(_ context.Context, _ string) *errors.ServiceError {
+	m.deleteCalled = true
+	return nil
+}
+
+// TestOnCreateSkipsHardDeleteForResourceMarkedAsDeleting verifies that OnCreate does NOT
+// hard-delete a resource (and thus does not drop the delete without notifying the agent) when
+// the resource is already marked as deleting (DeletedAt set). This guards against ARO-28432,
+// where a stale/retried Create event caused the server to silently hard-delete a resource that
+// had already been delivered to and applied by the agent, orphaning it on the managed cluster.
+func TestOnCreateSkipsHardDeleteForResourceMarkedAsDeleting(t *testing.T) {
+	RegisterTestingT(t)
+
+	resource := &api.Resource{
+		Meta: api.Meta{
+			ID:        uuid.New().String(),
+			DeletedAt: gorm.DeletedAt{Time: time.Now(), Valid: true},
+		},
+	}
+	mockSvc := &getDeleteMockResourceService{resource: resource}
+	client := &SourceClientImpl{
+		Codec:           NewCodec("test-source"),
+		ResourceService: mockSvc,
+		sourceID:        "test-source",
+		transport:       &mockTransport{},
+	}
+
+	err := client.OnCreate(context.Background(), resource.ID)
+	Expect(err).NotTo(HaveOccurred())
+	Expect(mockSvc.deleteCalled).To(BeFalse(), "OnCreate must not hard-delete a resource marked as deleting; the delete event must propagate the delete to the agent instead")
+}
+
+// TestOnCreateSkipsWhenResourceNotFound verifies OnCreate is a no-op when the resource has
+// already been hard-deleted (404).
+func TestOnCreateSkipsWhenResourceNotFound(t *testing.T) {
+	RegisterTestingT(t)
+
+	mockSvc := &getDeleteMockResourceService{getErr: errors.NotFound("resource not found")}
+	client := &SourceClientImpl{
+		Codec:           NewCodec("test-source"),
+		ResourceService: mockSvc,
+		sourceID:        "test-source",
+		transport:       &mockTransport{},
+	}
+
+	err := client.OnCreate(context.Background(), uuid.New().String())
+	Expect(err).NotTo(HaveOccurred())
+	Expect(mockSvc.deleteCalled).To(BeFalse())
 }
 
 func decodeHashList(evt cloudevents.Event) *cepayload.ResourceStatusHashList {
