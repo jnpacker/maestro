@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
+	ce "github.com/cloudevents/sdk-go/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
 	"open-cluster-management.io/sdk-go/pkg/cloudevents/server"
-
-	ce "github.com/cloudevents/sdk-go/v2"
 
 	"github.com/openshift-online/maestro/pkg/api"
 	"github.com/openshift-online/maestro/pkg/errors"

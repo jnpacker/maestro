@@ -8,9 +8,8 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
-
 	. "github.com/onsi/gomega"
+	"gorm.io/gorm"
 	ceoptions "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/options"
 	cepayload "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/payload"
 	cetypes "open-cluster-management.io/sdk-go/pkg/cloudevents/generic/types"
