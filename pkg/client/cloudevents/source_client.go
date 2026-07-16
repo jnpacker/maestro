@@ -77,8 +77,16 @@ func (s *SourceClientImpl) OnCreate(ctx context.Context, id string) error {
 	}
 
 	if !resource.Meta.DeletedAt.Time.IsZero() {
-		logger.Info("delete resource as it is not created on the agent yet")
-		return s.ResourceService.Delete(ctx, id)
+		// The resource is already marked as deleting. Do NOT assume it was never sent to the
+		// agent and hard-delete it here: this Create event may be a stale/retried event for a
+		// resource that was already successfully delivered to (and applied by) the agent through
+		// another path (e.g. a prior successful publish whose event wasn't marked reconciled, a
+		// resync, or an update). Hard-deleting here would silently drop the delete without ever
+		// notifying the agent, orphaning the applied resource on the managed cluster.
+		// Skip this create; the corresponding delete event will publish the delete_request and
+		// the resource will be hard-deleted once the agent confirms deletion.
+		logger.Info("skipping create for resource that is marked as deleting; the delete event will propagate the delete")
+		return nil
 	}
 
 	logger.Info("Publishing resource for db row insert")
