@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -192,6 +193,17 @@ func (helper *Helper) startAPIServer() {
 		helper.APIServer.Start(helper.Ctx)
 		logger.V(4).Info("Test API server stopped")
 	}()
+
+	// Wait until the API server is listening and ready
+	addr := helper.Env().Config.HTTPServer.Hostname + ":" + helper.Env().Config.HTTPServer.BindPort
+	for i := 0; i < 50; i++ {
+		conn, err := net.DialTimeout("tcp", addr, 100*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func (helper *Helper) stopAPIServer() error {

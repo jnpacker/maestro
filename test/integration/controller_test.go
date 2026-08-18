@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -685,16 +686,26 @@ func TestSpecEventAgeMetric(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	consumer, err := h.CreateConsumer("cluster-" + rand.String(5))
+	Expect(err).NotTo(HaveOccurred())
+
+	resourceID := uuid.NewString()
+	res, err := h.NewResource(resourceID, consumer.Name, "nginx-"+rand.String(5), "default", 1, 1)
+	Expect(err).NotTo(HaveOccurred())
+	resourceDao := dao.NewResourceDao(&h.Env().Database.SessionFactory)
+	_, err = resourceDao.Create(ctx, res)
+	Expect(err).NotTo(HaveOccurred())
+
 	// Create an unreconciled event backdated two minutes
 	evt := &api.Event{
 		Meta: api.Meta{
 			CreatedAt: time.Now().Add(-2 * time.Minute),
 		},
 		Source:    "Resources",
-		SourceID:  uuid.NewString(),
+		SourceID:  resourceID,
 		EventType: api.CreateEventType,
 	}
-	err := h.Env().Database.SessionFactory.New(ctx).Transaction(func(tx *gorm.DB) error {
+	err = h.Env().Database.SessionFactory.New(ctx).Transaction(func(tx *gorm.DB) error {
 		return tx.Omit(clause.Associations).Create(evt).Error
 	})
 	if err != nil {
@@ -738,15 +749,14 @@ func TestSpecEventAgeMetric(t *testing.T) {
 					return fmt.Errorf("metric has no samples yet")
 				}
 				age = metrics[0].GetGauge().GetValue()
-				if age == 0 {
-					return fmt.Errorf("metric sample is zero")
+				if math.IsNaN(age) || age < 120 {
+					return fmt.Errorf("metric sample is not ready (got %v)", age)
 				}
 				return nil
 			}
 		}
 		return fmt.Errorf("metric spec_controller_event_oldest_unreconciled_age_seconds not found")
 	}, 10*time.Second, 1*time.Second).Should(Succeed())
-	Expect(age).Should(BeNumerically(">=", 120))
 }
 
 func TestNotificationQueueUsageMetric(t *testing.T) {
